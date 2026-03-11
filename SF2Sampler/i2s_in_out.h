@@ -3,12 +3,10 @@
 #include <Arduino.h>
 #include "config.h"
 /**
-*
-* I2S audio helper class for ESP32 family
-* I2S port 0 assumed
+* I2S audio helper class for ESP32 family (ESP32-S3, ESP32-P4, etc.)
+* I2S port 0 assumed. On Arduino 3.x uses driver V3 (i2s_std).
 * by copych 2024-2025
 * https://gitverse.com/copych
-*
 */
 
 #define   AUDIO_CHANNEL_NUM     2     // number of channels, some bugs are present for 1
@@ -21,7 +19,7 @@
   #include "driver/i2s.h"
 #else
   #define USE_V3
-  // ESP Arduino cores 3.0.0 and up
+  // ESP Arduino 3.x (ESP32-S3, ESP32-P4 等) 使用 I2S 新驱动
   #include "driver/i2s_std.h"
 #endif
 

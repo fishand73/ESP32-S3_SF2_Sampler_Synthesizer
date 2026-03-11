@@ -1,12 +1,12 @@
-# ESP32-S3 SoundFont (SF2) Sampler Synthesizer
+# ESP32-S3 / ESP32-P4 SoundFont (SF2) Sampler Synthesizer
 
-An SF2 (SoundFont 2) based wavetable synth designed specifically for the ESP32-S3 microcontroller. This project leverages the enhanced memory capabilities of the ESP32-S3 (with PSRAM) to efficiently load and play SoundFont samples, providing a compact and powerful sampler solution. It's cheap and simple, yet powerful.
+An SF2 (SoundFont 2) based wavetable synth for **ESP32-S3** and **ESP32-P4**. It uses PSRAM / 外部 RAM  to load and play SoundFont samples, with USB MIDI and I2S DAC output. It's cheap and simple, yet powerful.
 
 ---
 
 ## Overview
 
-The ESP32-S3 SF2 Sampler is a sampler firmware that runs exclusively on the ESP32-S3 variant due to its improved PSRAM and memory management compared to the original ESP32. It supports external DACs like the PCM5102 for high-quality audio output and uses the built-in USB hardware of the ESP32-S3 to function as a USB MIDI device. By default, the BOOT button of the DevBoard is configured to cycle through SF2 files on the current filesystem. Long press on BOOT button will switch between Flash LittleFS and SD filesystems.
+The firmware runs on **ESP32-S3** (with PSRAM) or **ESP32-P4** (Arduino-ESP32 3.1+ / ESP-IDF 5.3+). It supports external DACs like the PCM5102, built-in USB MIDI, and optionally SD card and LittleFS. By default, the BOOT button cycles through SF2 files; long press switches between Flash LittleFS and SD.
 
 <img src="./media/prototype.jpg?raw=true">
 
@@ -22,14 +22,14 @@ The ESP32-S3 SF2 Sampler is a sampler firmware that runs exclusively on the ESP3
 - **Effects**: Reverb (CC#91), Chorus (CC#93), Delay (CC#95).
 - **MIDI control**: GM, partially GS/XG-compatible CCs, PC, RPNs, drums on ch.10, GM reset.
 - **External DAC**: Works with PCM5102 and similar I2S DACs.
-- **ESP32-S3 optimized**: Dual-core, PSRAM, minimal wiring.
+- **ESP32-S3 / ESP32-P4**: Dual-core, PSRAM or internal RAM, minimal wiring.
 - **Optional OLED GUI**: Use a rotary encoder and a button to navigate. 
 
 ---
 
 ## Hardware Requirements
 
-- **ESP32-S3 microcontroller** with PSRAM (OPI PSRAM recommended)
+- **ESP32-S3**（带 PSRAM，推荐 OPI）或 **ESP32-P4**（32MB PSRAM，Arduino-ESP32 3.1+）
 - **External DAC** (e.g., PCM5102)
 - USB connection for MIDI and power
 
@@ -86,31 +86,30 @@ These pins can be changed in config.h if needed
 
 ### Arduino IDE Configuration
 
-To build and upload this project using Arduino IDE, configure the following settings:
-
-- **PSRAM**: Select **OPI PSRAM**
-- **Partition Scheme**: Choose a partition with the most available SPDIFF space
-- **USB Mode**: Select **TINY USB**
-- **Core Debug Level**: Set to **Info** or lower (higher debug levels may block USB functionality)
-- **Upload SF2 files to internal Flash**: use this plugin for Arduino IDE 2.x.x https://github.com/earlephilhower/arduino-littlefs-upload , or ths one https://github.com/earlephilhower/arduino-esp8266littlefs-plugin if you use Arduino IDE 1.x
-- **Wire a microSD or SD card** to have a lot of SF2 files to choose from 
+- **Board**: **ESP32-S3** 或 **ESP32-P4**（P4 需 Arduino-ESP32 3.1+）
+- **PSRAM** (S3): 选择 **OPI PSRAM**
+- **Partition Scheme**: 选可用 SPIFFS/LittleFS 空间较大的方案
+- **USB Mode**: **TINY USB**
+- **Core Debug Level**: **Info** 或更低（过高可能影响 USB）
+- **Upload SF2 to Flash**: Arduino IDE 2.x 可用 https://github.com/earlephilhower/arduino-littlefs-upload
+- **ESP32-P4**: 引脚在 `config.h` 中按 `TARGET_ESP32P4` 区分，请根据开发板原理图修改 I2S / SDMMC / GUI 引脚 
 
 ---
 
 ## Usage
 
-1. Connect your ESP32-S3 board with PSRAM and external DAC according to the pinout above.
-2. Load your preferred SF2 SoundFont files onto the device (refer to project documentation for details on loading SF2 files).
-3. Connect the ESP32-S3 via USB to your computer or MIDI host.
-4. The device will enumerate as a USB MIDI device, allowing you to play samples via MIDI input.
+1. 按上表连接 ESP32-S3 或 ESP32-P4 与外部 DAC。
+2. 将 SF2 音色文件写入 Flash 或 SD 卡。
+3. 用 USB 连接电脑或 MIDI 主机；设备将显示为 USB MIDI 设备（S3 为 "S3 SF2 Synth"，P4 为 "P4 SF2 Synth"）。
+4. 通过 MIDI 输入演奏。
 
 ---
 
 ## Notes
 
-- This project is **only compatible with the ESP32-S3** due to memory and PSRAM requirements.
-- Using a core debug level above **Info** may interfere with USB MIDI functionality.
-- Ensure your external DAC is properly powered and connected for optimal audio quality.
+- 支持 **ESP32-S3**（需 PSRAM）和 **ESP32-P4**（32MB PSRAM，需 Arduino-ESP32 3.1+）。P4 无蓝牙，代码已做条件编译。
+- 调试级别高于 **Info** 可能影响 USB MIDI。
+- 确保外接 DAC 供电与连接正确。
 
 ---
 
@@ -128,11 +127,11 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Links
 - [Free SoundFonts](https://github.com/ZmeyKolbasnik/Instruments/tree/master)
-- [ESP32-S3 Documentation](https://www.espressif.com/en/products/socs/esp32-s3)
+- [ESP32-S3](https://www.espressif.com/en/products/socs/esp32-s3) / [ESP32-P4](https://www.espressif.com/en/products/socs/esp32-p4)
 - [SoundFont 2 Specification](https://en.wikipedia.org/wiki/SoundFont)
-- [ESP Partition Excel calculator](https://github.com/copych/ESP32-S3_SF2_Sampler_Synthesizer/tree/main/partitions)
+- [ESP Partition calculator](https://github.com/copych/ESP32-S3_SF2_Sampler_Synthesizer/tree/main/partitions)
 
 ---
 
-Enjoy your ESP32-S3 powered sampler!
+Enjoy your ESP32-S3 / ESP32-P4 sampler!
 

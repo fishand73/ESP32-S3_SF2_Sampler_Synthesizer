@@ -1,13 +1,7 @@
 /*
-* ESP32-S3 SF2 Sampler
-* An SF2 (SoundFont 2) based synthesizer designed specifically for the ESP32-S3 microcontroller.
-* This project leverages the enhanced memory capabilities of the ESP32-S3 (with PSRAM)
-* to efficiently load and play SoundFont samples, providing a compact and powerful sampler solution.
-* The ESP32-S3 SF2 Sampler is a sampler firmware that runs exclusively on the ESP32-S3 variant
-* due to its improved PSRAM and memory management compared to the original ESP32. 
-* It supports external DACs like the PCM5102 for high-quality audio output and 
-* uses the built-in USB hardware of the ESP32-S3 to function as a USB MIDI device.
-* GM/GS/XG support is partlially implemented (i.e. with 2MBGMGS.sf2 bank).
+* ESP32-S3 / ESP32-P4 SF2 Sampler
+* SF2 (SoundFont 2) 软音源，支持 ESP32-S3（带 PSRAM）与 ESP32-P4（Arduino-ESP32 3.1+）。
+* 使用 USB MIDI 与 I2S 外接 DAC（如 PCM5102）。GM/GS/XG 部分支持（如 2MBGMGS.sf2）。
 *
 * Libraries used:
 * Arduino MIDI library https://github.com/FortySevenEffects/arduino_midi_library
@@ -265,13 +259,19 @@ void setup() {
       vTaskDelay(10);
       while(true);
     }
-    btStop(); 
+#if defined(SOC_BT_SUPPORTED) && SOC_BT_SUPPORTED
+    btStop();
+#endif 
     
 #if MIDI_IN_DEV == USE_USB_MIDI_DEVICE
   // Change USB Device Descriptor Parameter
     USB.VID(0x1209);
     USB.PID(0x1304);
+#if TARGET_ESP32P4
+    USB.productName("P4 SF2 Synth");
+#else
     USB.productName("S3 SF2 Synth");
+#endif
     USB.manufacturerName("copych");
     USB.usbVersion(0x0200);
     USB.usbClass(TUSB_CLASS_AUDIO);

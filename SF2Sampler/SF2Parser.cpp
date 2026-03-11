@@ -23,8 +23,10 @@
  */
 
 #include "SF2Parser.h"
+#include "config.h"
 #include "esp_log.h"
 #include "operators.h"
+#include <algorithm>
 
 static const char* TAG = "SF2Parser";
 
@@ -111,13 +113,16 @@ bool SF2Parser::parse() {
     }  else {
       ESP_LOGI(TAG, "PDTA OK");
     }
+#ifdef LAZY_LOAD_16_PRESETS
+    smplStart = sdtaOffset + 8;  /* "smpl" id(4) + size(4) 后即样本数据 */
+    ESP_LOGI(TAG, "Lazy load: only 16 channel presets will be loaded on demand, smplStart=%u", (unsigned)smplStart);
+#else
     if (!loadSampleDataToMemory()) {
         ESP_LOGE(TAG, "Failed to load all sample data into memory, some samples may not play");
-        //optionally bind all absent samples to the first sample
-        //return false;
     } else {
         ESP_LOGI(TAG, "Memory load OK");
     }
+#endif
 
     file.close();
     return true;
@@ -756,3 +761,106 @@ bool SF2Parser::hasPreset(uint16_t bank, uint16_t program) const {
     }
     return false;
 }
+
+#if defined(LAZY_LOAD_16_PRESETS)
+void SF2Parser::getSampleIndicesForPreset(uint16_t bank, uint16_t program, std::vector<size_t>& out) const {
+    out.clear();
+    for (const auto& preset : presets) {
+        if (preset.bank != bank || preset.program != program) continue;
+        for (const auto& pzone : preset.zones) {
+            int instIndex = -1;
+            for (const auto& g : pzone.generators) {
+                if (static_cast<GeneratorOperator>(g.oper) == GeneratorOperator::Instrument) {
+                    instIndex = g.amount.sAmount;
+                    break;
+                }
+            }
+            if (instIndex < 0 || instIndex >= (int)instruments.size()) continue;
+            const auto& inst = instruments[instIndex];
+            for (const auto& izone : inst.zones) {
+                for (const auto& g : izone.generators) {
+                    if (static_cast<GeneratorOperator>(g.oper) == GeneratorOperator::SampleID) {
+                        int sampleIndex = g.amount.sAmount;
+                        if (sampleIndex >= 0 && sampleIndex < (int)samples.size()) {
+                            size_t idx = (size_t)sampleIndex;
+                            if (std::find(out.begin(), out.end(), idx) == out.end())
+                                out.push_back(idx);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool SF2Parser::ensureSamplesLoadedForPreset(uint16_t bank, uint16_t program,
+        const uint16_t* channelBanks, const uint16_t* channelPrograms) {
+    if (sdtaOffset == 0 || smplStart == 0 || samples.empty()) return false;
+
+    /* 计算当前 16 通道使用的所有 preset 的样本集合（允许保留） */
+    std::vector<size_t> keepSet;
+    if (channelBanks && channelPrograms) {
+        for (int c = 0; c < 16; c++) {
+            getSampleIndicesForPreset(channelBanks[c], channelPrograms[c], keepSet);
+        }
+        /* 去重：getSampleIndicesForPreset 每次会 clear out，所以上面只得到最后一通道的。需要合并 */
+        keepSet.clear();
+        for (int c = 0; c < 16; c++) {
+            std::vector<size_t> one;
+            getSampleIndicesForPreset(channelBanks[c], channelPrograms[c], one);
+            for (size_t idx : one) {
+                if (std::find(keepSet.begin(), keepSet.end(), idx) == keepSet.end())
+                    keepSet.push_back(idx);
+            }
+        }
+    }
+
+    /* 驱逐：已加载但不在 keepSet 中的样本释放掉 */
+    for (size_t i = 0; i < samples.size(); i++) {
+        SampleHeader& s = samples[i];
+        if (!s.data) continue;
+        bool keep = !channelBanks || std::find(keepSet.begin(), keepSet.end(), i) != keepSet.end();
+        if (!keep) {
+            heap_caps_aligned_free(s.data);
+            s.data = nullptr;
+            s.dataSize = 0;
+        }
+    }
+
+    /* 需要加载的 (bank,program) 的样本 */
+    std::vector<size_t> need;
+    getSampleIndicesForPreset(bank, program, need);
+
+    File f = filesystem->open(filepath.c_str(), "r");
+    if (!f) {
+        ESP_LOGE(TAG, "ensureSamplesLoaded: cannot reopen SF2 file");
+        return false;
+    }
+
+    bool ok = true;
+    for (size_t idx : need) {
+        if (idx >= samples.size()) continue;
+        SampleHeader& s = samples[idx];
+        if (s.data) continue;  /* 已加载 */
+
+        uint32_t length = (s.end > s.start) ? (s.end - s.start) : 0;
+        if (length == 0) continue;
+
+        s.data = (uint8_t*)heap_caps_aligned_alloc(4, length * sizeof(int16_t), MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+        if (!s.data) {
+            ESP_LOGE(TAG, "PSRAM allocation failed for sample %zu (%s), size=%u", idx, s.name, (unsigned)(length * 2));
+            ok = false;
+            continue;
+        }
+        f.seek(smplStart + s.start * 2, SeekSet);
+        size_t readLen = f.read((uint8_t*)s.data, length * 2);
+        s.dataSize = (readLen <= length * 2) ? readLen : (length * 2);
+        if (readLen < length * 2) {
+            ESP_LOGW(TAG, "Sample %zu short read: %u", (unsigned)idx, (unsigned)readLen);
+        }
+    }
+    f.close();
+    return ok;
+}
+#endif

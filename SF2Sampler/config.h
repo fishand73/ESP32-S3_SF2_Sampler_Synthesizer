@@ -1,6 +1,6 @@
 /*
  * ----------------------------------------------------------------------------
- * ESP32-S3 SF2 Synthesizer Firmware
+ * ESP32-S3 / ESP32-P4 SF2 Synthesizer Firmware
  * 
  * Description:
  *   Real-time SF2 (SoundFont) compatible wavetable synthesizer with USB MIDI, I2S audio,
@@ -8,7 +8,7 @@
  *   GM/GS/XG support is partly implemented
  * 
  * Hardware:
- *   - ESP32-S3 with PSRAM
+ *   - ESP32-S3 or ESP32-P4 (with PSRAM / 外部 RAM)
  *   - I2S DAC output (44100Hz stereo, 16-bit PCM)
  *   - USB MIDI input
  *   - Optional SD card and/or LittleFS
@@ -23,6 +23,13 @@
  */
 
 #pragma once
+
+// 目标芯片检测（ESP32-P4 带 32MB PSRAM，需 Arduino-ESP32 3.1+ / ESP-IDF 5.3+）
+#if defined(CONFIG_IDF_TARGET_ESP32P4) || defined(ARDUINO_ARCH_ESP32P4)
+  #define TARGET_ESP32P4 1
+#else
+  #define TARGET_ESP32P4 0
+#endif
 
 // ===================== AUDIO ======================================================================================
 #define   DMA_BUFFER_NUM        2     // number of internal DMA buffers
@@ -55,23 +62,49 @@
 
 static const char* SF2_PATH = "/"; 
 #define DEFAULT_CONFIG_FILE "/default_config.bin"
+
+// 仅加载当前 16 个 MIDI 通道使用的音色样本，节省 PSRAM（大 SF2 时推荐开启）
+#define LAZY_LOAD_16_PRESETS
+
 // ===================== MIDI PINS ==================================================================================
-#define MIDI_IN         15      // if USE_MIDI_STANDARD is selected as MIDI_IN, this pin receives MIDI messages
+#if TARGET_ESP32P4
+  #define MIDI_IN         15    // ESP32-P4: 若使用串口 MIDI，按开发板调整
+#else
+  #define MIDI_IN         15    // if USE_MIDI_STANDARD is selected as MIDI_IN, this pin receives MIDI messages
+#endif
 
 // ===================== I2S PINS ===================================================================================
-#define I2S_BCLK_PIN    5       // I2S BIT CLOCK pin (BCL BCK CLK)
-#define I2S_DOUT_PIN    6       // MCU Data Out: connect to periph. DATA IN (DIN D DAT)
-#define I2S_WCLK_PIN    7       // I2S WORD CLOCK pin (WCK WCL LCK)
-#define I2S_DIN_PIN     -1      // MCU Data In: connect to periph. DATA OUT (DOUT D SD)
+#if TARGET_ESP32P4
+  // ESP32-P4: 请根据开发板与 DAC 连接修改
+  #define I2S_BCLK_PIN    5
+  #define I2S_DOUT_PIN    6
+  #define I2S_WCLK_PIN    7
+  #define I2S_DIN_PIN     -1
+#else
+  #define I2S_BCLK_PIN    5     // I2S BIT CLOCK pin (BCL BCK CLK)
+  #define I2S_DOUT_PIN    6     // MCU Data Out: connect to periph. DATA IN (DIN D DAT)
+  #define I2S_WCLK_PIN    7     // I2S WORD CLOCK pin (WCK WCL LCK)
+  #define I2S_DIN_PIN     -1    // MCU Data In: connect to periph. DATA OUT (DOUT D SD)
+#endif
 
 // ===================== SD MMC PINS ================================================================================
-// ESP32S3 allows almost any GPIOs for any particular needs
-#define SDMMC_CMD 38
-#define SDMMC_CLK 39
-#define SDMMC_D0  10
-#define SDMMC_D1  11
-#define SDMMC_D2  12
-#define SDMMC_D3  13
+#if TARGET_ESP32P4
+  // ESP32-P4: SDMMC Slot1 支持灵活 GPIO，请按开发板原理图设置
+  #define SDMMC_CMD 38
+  #define SDMMC_CLK 39
+  #define SDMMC_D0  10
+  #define SDMMC_D1  11
+  #define SDMMC_D2  12
+  #define SDMMC_D3  13
+#else
+  // ESP32S3 allows almost any GPIOs for any particular needs
+  #define SDMMC_CMD 38
+  #define SDMMC_CLK 39
+  #define SDMMC_D0  10
+  #define SDMMC_D1  11
+  #define SDMMC_D2  12
+  #define SDMMC_D3  13
+#endif
 
 // ===================== GUI SETTINGS ==========================================================================
 #define ENABLE_GUI
@@ -82,12 +115,19 @@ static const char* SF2_PATH = "/";
 
   #define ACTIVE_STATE  LOW   // LOW = switch connects to GND, HIGH = switch connects to 3V3
 
+#if TARGET_ESP32P4
+  #define BTN0_PIN       14
+  #define ENC0_A_PIN     15
+  #define ENC0_B_PIN     16
+  #define DISPLAY_SDA    8
+  #define DISPLAY_SCL    9
+#else
   #define BTN0_PIN 	14
   #define ENC0_A_PIN 	15
   #define ENC0_B_PIN 	16
-
   #define DISPLAY_SDA 8 // SDA GPIO
   #define DISPLAY_SCL 9 // SCL GPIO
+#endif
 
   #define DISPLAY_W 128
   #define DISPLAY_H 64

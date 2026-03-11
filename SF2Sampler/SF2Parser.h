@@ -148,6 +148,14 @@ public:
     bool hasPreset(uint16_t bank, uint16_t program) const ;
     void clear();
 
+#if defined(LAZY_LOAD_16_PRESETS)
+    /** 获取某 preset 用到的样本在 samples[] 中的下标（用于按需加载/驱逐） */
+    void getSampleIndicesForPreset(uint16_t bank, uint16_t program, std::vector<size_t>& out) const;
+    /** 确保 (bank,program) 的样本已加载；channelBanks/Programs 为 16 通道当前音色，用于驱逐非当前音色的样本（可传 nullptr 表示不驱逐） */
+    bool ensureSamplesLoadedForPreset(uint16_t bank, uint16_t program,
+        const uint16_t* channelBanks, const uint16_t* channelPrograms);
+#endif
+
 private:
     bool parseHeaderChunks();
     bool parseSDTA();
@@ -177,6 +185,9 @@ private:
     uint32_t pdtaOffset = 0;
     uint32_t pdtaSize = 0;
 
+#if defined(LAZY_LOAD_16_PRESETS)
+    uint32_t smplStart = 0;  /* 文件中样本数据起始偏移（sdta 内 "smpl" 后 8 字节） */
+#endif
 };
 
 

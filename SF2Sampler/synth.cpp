@@ -92,6 +92,17 @@ void Synth::noteOn(uint8_t ch, uint8_t note, uint8_t vel) {
 
     chan->activityIncrease(vel);
 
+#ifdef LAZY_LOAD_16_PRESETS
+    {
+        uint16_t banks[16], progs[16];
+        for (int c = 0; c < 16; c++) {
+            banks[c] = channels[c].getBank();
+            progs[c] = (uint16_t)channels[c].program;
+        }
+        parser.ensureSamplesLoadedForPreset(chan->getBank(), (uint16_t)chan->program, banks, progs);
+    }
+#endif
+
     bool isMono = chan->monoMode != ChannelState::Poly;
     bool retrig = chan->monoMode != ChannelState::MonoLegato;
 
@@ -109,7 +120,7 @@ void Synth::noteOn(uint8_t ch, uint8_t note, uint8_t vel) {
 
             // Start new voices for all zones
             for (auto& zone : zones) {
-                if (!zone.sample) continue;
+                if (!zone.sample || !zone.sample->data) continue;
                 float score = vel * DIV_127;
                 Voice* v = allocateVoice(ch, note, score, zone.exclusiveClass);
                 if (v) v->startNew(ch, note, vel, zone, chan);
@@ -130,7 +141,7 @@ void Synth::noteOn(uint8_t ch, uint8_t note, uint8_t vel) {
             if (!reused) {
                 // First note: start new voices
                 for (auto& zone : zones) {
-                    if (!zone.sample) continue;
+                    if (!zone.sample || !zone.sample->data) continue;
                     float score = vel * DIV_127;
                     Voice* v = allocateVoice(ch, note, score, zone.exclusiveClass);
                     if (v) v->startNew(ch, note, vel, zone, chan);
@@ -140,7 +151,7 @@ void Synth::noteOn(uint8_t ch, uint8_t note, uint8_t vel) {
     } else {
         // Polyphonic: start new voices normally
         for (auto& zone : zones) {
-            if (!zone.sample) continue;
+            if (!zone.sample || !zone.sample->data) continue;
             float score = vel * DIV_127;
             Voice* v = allocateVoice(ch, note, score, zone.exclusiveClass);
             if (v) v->startNew(ch, note, vel, zone, chan);
@@ -411,6 +422,17 @@ void Synth::programChange(uint8_t ch, uint8_t program) {
     state.wantProgram = program & 0x7F;
 
     applyBankProgram(ch);
+
+#ifdef LAZY_LOAD_16_PRESETS
+    {
+        uint16_t banks[16], progs[16];
+        for (int c = 0; c < 16; c++) {
+            banks[c] = channels[c].getBank();
+            progs[c] = (uint16_t)channels[c].program;
+        }
+        parser.ensureSamplesLoadedForPreset(state.getBank(), (uint16_t)state.program, banks, progs);
+    }
+#endif
 }
 
 
@@ -809,6 +831,21 @@ bool Synth::loadSf2File(const char* filename) {
 
     reset();      // Stop voices and reset channels
     GMReset();    // Apply GM defaults
+
+#ifdef LAZY_LOAD_16_PRESETS
+    /* 预加载当前 16 通道音色，避免首次按键时再读文件 */
+    {
+        uint16_t banks[16], progs[16];
+        for (int c = 0; c < 16; c++) {
+            banks[c] = channels[c].getBank();
+            progs[c] = (uint16_t)channels[c].program;
+        }
+        for (int c = 0; c < 16; c++) {
+            parser.ensureSamplesLoadedForPreset(channels[c].getBank(), (uint16_t)channels[c].program, banks, progs);
+        }
+    }
+#endif
+
    // parser.dumpPresetStructure();
  
     currentSf2Path = String(fullPath); 

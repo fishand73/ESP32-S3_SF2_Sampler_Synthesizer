@@ -274,7 +274,7 @@ void I2S_Audio::writeBuffers(float* L, float* R) {
     i2s_channel_write(tx_handle, _output_buf, _buffer_size, &bytes_written, portMAX_DELAY);
 #else
     size_t bytes_written = 0;
-    i2s_write(_i2s_num, _output_buf, _buffer_size, &bytes_written, portMAX_DELAY);
+    i2s_write(_i2s_port, _output_buf, _buffer_size, &bytes_written, portMAX_DELAY);
 #endif
 }
 
